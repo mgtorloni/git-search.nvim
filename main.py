@@ -28,14 +28,14 @@ def generate_search_query(user_input: str) -> str:
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": user_input},
         ],
-        "temperature": 0.1,  # Low temperature for deterministic results
+        "temperature": 0.1,  # low creativity
     }
 
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=5)
-        response.raise_for_status()  # Raise error for 4xx/5xx
+        response.raise_for_status()
 
         data = response.json()
         content = data["choices"][0]["message"]["content"]
@@ -43,6 +43,11 @@ def generate_search_query(user_input: str) -> str:
         return content.strip().replace("`", "").replace('"', "")
 
     except Exception as e:
+        print(f"DEBUG ERROR: {e}")
+
+        if "response" in locals():
+            print(f"DEBUG RESPONSE: {response.text}")
+
         return user_input
 
 
@@ -50,7 +55,7 @@ def get_token_from_cli():
     try:
         result = subprocess.run(
             ["gh", "auth", "token"], capture_output=True, text=True
-        )  # we run this so that we can get more calls
+        )  # we try to run this so that we can get more calls raising the number of results we can get
         token = result.stdout.strip()
 
         if not token:
@@ -96,7 +101,7 @@ def has_active_actions(repo_full_name):
 
 
 def search(query: str, limit: int = 5) -> list[str]:
-    if limit > 50:
+    if limit > 50:  # no one needs more than 50 results
         raise Exception(
             "Limit must be less than or equal to 50. Please reduce the limit and try again."
         )
@@ -110,7 +115,8 @@ def search(query: str, limit: int = 5) -> list[str]:
 
 def main():
     useful_repos = list()
-    for repo in search("numpy", limit=5):
+    query = generate_search_query("linear algebra library rust")
+    for repo in search(query, limit=5):
         if has_active_actions(repo["full_name"]):  # CI action detected
             useful_repos.append(repo)
 
