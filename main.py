@@ -8,6 +8,7 @@ import os
 def generate_search_query(user_input: str) -> str:
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
+        print("Error: GROQ_API_KEY environment variable is not set.")
         return user_input
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -40,7 +41,9 @@ def generate_search_query(user_input: str) -> str:
         data = response.json()
         content = data["choices"][0]["message"]["content"]
 
-        return content.strip().replace("`", "").replace('"', "")
+        return (
+            content.strip().replace("`", "").replace('"', "")
+        )  # if the llm was bad we remove backticks manually
 
     except Exception as e:
         print(f"DEBUG ERROR: {e}")
@@ -105,22 +108,37 @@ def search(query: str, limit: int = 5) -> list[str]:
         raise Exception(
             "Limit must be less than or equal to 50. Please reduce the limit and try again."
         )
-    api_search = (
-        f"https://api.github.com/search/repositories?q={query}&per_page={limit}"
-    )
+    url = "https://api.github.com/search/repositories"
 
-    response = requests.get(api_search)
-    return response.json()["items"]
+    params = {"q": query, "per_page": limit}
+
+    response = requests.get(
+        url, params=params, headers=headers
+    )  # let requests handle encoding otherwise if we have spaces in the query it will break
+
+    if response.status_code != 200:
+        print(f"Error searching GitHub: {response.status_code}")
+        print(response.json())
+        return []
+    return response.json().get("items", [])
 
 
 def main():
     useful_repos = list()
-    query = generate_search_query("linear algebra library rust")
-    for repo in search(query, limit=5):
+    query = generate_search_query(sys.argv[1])
+    results = search(query, limit=5)
+
+    if not results:
+        print("No results found.")
+        return
+
+    for repo in results:
         if has_active_actions(repo["full_name"]):  # CI action detected
             useful_repos.append(repo)
 
-    print(json.dumps(useful_repos, indent=4))
+    for repo in useful_repos:
+        print(repo["full_name"])
+    # print(json.dumps(useful_repos, indent=4))
 
     # for file in repo_files:
     #     print(f"{file['name']}")
