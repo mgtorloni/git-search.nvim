@@ -145,7 +145,7 @@ async def process_repos(results, headers) -> list[str]:
 def main():
     useful_repos = list()
     query = generate_search_query(sys.argv[1])
-    print(repr(query))
+    print(query)
     results = search(query, limit=10)
 
     if not results:
